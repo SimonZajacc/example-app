@@ -69,9 +69,6 @@ jobs:
   
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        with:
-          scan-path: "."
-          output: "gitleaks_report.json"
         env:
           GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
   
