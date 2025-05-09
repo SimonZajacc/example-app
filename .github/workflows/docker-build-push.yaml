@@ -39,9 +39,13 @@ jobs:
 
   security-checks:
     runs-on: ubuntu-latest
-    if: github.event_type == 'security-checks'
+    #if: github.event_type == 'security-checks'
 
     steps:
+      - name: Debug GitHub event
+        run: |
+          echo "Event payload: ${{ toJson(github.event) }}"
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
