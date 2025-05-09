@@ -63,7 +63,7 @@ jobs:
 
       - name: Install Gitleaks
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.12.0/gitleaks-linux-amd64 -o /usr/local/bin/gitleaks
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.25.1/gitleaks-linux-amd64 -o /usr/local/bin/gitleaks
           chmod +x /usr/local/bin/gitleaks
 
       - name: Install Hadolint
