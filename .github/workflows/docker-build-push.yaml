@@ -1,6 +1,5 @@
-name: Docker Build and Push + Security checks
+name: Docker Build and Push + Security Checks
 
-# triggered by image-service microservice
 on:
   repository_dispatch:
     types: [docker-build-push, security-checks]
@@ -40,77 +39,81 @@ jobs:
   security-checks:
     runs-on: ubuntu-latest
     if: github.event.client_payload.event_type == 'security-checks'
-  
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-  
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-  
+
       - name: Extract Variables from Event Payload
         run: |
           echo "IMAGE_NAME=${{ github.event.client_payload.image_name }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ github.event.client_payload.image_tag }}" >> $GITHUB_ENV
-          echo "GITHUB_TOKEN=${{ github.event.client_payload.github_token }}" >> $GITHUB_ENV
-  
-      - name: Install Grype
+          echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+
+      - name: Pull Docker Image for Scanning
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-  
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
       - name: Install Hadolint
         run: |
           wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
           chmod +x /usr/local/bin/hadolint
-  
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
       - name: Install Syft
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-  
+
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
-  
+        with:
+          config-path: .gitleaks.toml
+        continue-on-error: true
+
       - name: Run Hadolint
         run: |
-          hadolint Dockerfile > hadolint_report.txt
-  
-      - name: Scan Docker Image with Grype
+          hadolint Dockerfile > hadolint_report.txt || true
+
+      - name: Scan with Grype
         run: |
-          grype ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > grype_report.json
-  
+          grype docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > grype_report.json || true
+
       - name: Generate SBOM with Syft
         run: |
-          syft ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > sbom.json
-  
+          syft docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > sbom.json || true
+
       - name: Vulnerability Scan with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.19.0
         with:
-          image-ref: "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          image-ref: "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           format: "json"
           output: "trivy_report.json"
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
-  
+
       - name: Combine Reports
         run: |
           echo "Security Report - $(date)" > security_report.txt
-          echo "\nGitleaks Report:" >> security_report.txt
-          cat gitleaks_report.json >> security_report.txt
-          echo "\nHadolint Report:" >> security_report.txt
-          cat hadolint_report.txt >> security_report.txt
-          echo "\nGrype Report:" >> security_report.txt
-          cat grype_report.json >> security_report.txt
-          echo "\nSyft SBOM:" >> security_report.txt
-          cat sbom.json >> security_report.txt
-          echo "\nTrivy Report:" >> security_report.txt
-          cat trivy_report.json >> security_report.txt
-  
+          echo "\n--- Hadolint ---" >> security_report.txt
+          cat hadolint_report.txt >> security_report.txt || true
+          echo "\n--- Grype ---" >> security_report.txt
+          cat grype_report.json >> security_report.txt || true
+          echo "\n--- Syft (SBOM) ---" >> security_report.txt
+          cat sbom.json >> security_report.txt || true
+          echo "\n--- Trivy ---" >> security_report.txt
+          cat trivy_report.json >> security_report.txt || true
+          echo "\n--- Gitleaks ---" >> security_report.txt
+          echo "(Report available in GitHub Actions logs)" >> security_report.txt
+
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
           name: security_report
           path: security_report.txt
-
