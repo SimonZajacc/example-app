@@ -42,10 +42,6 @@ jobs:
     if: github.event.client_payload.event_type == 'security-checks'
 
     steps:
-      - name: Debug GitHub event
-        run: |
-          echo "Event payload: ${{ toJson(github.event) }}"
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
