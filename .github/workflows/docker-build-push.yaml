@@ -40,61 +40,61 @@ jobs:
   security-checks:
     runs-on: ubuntu-latest
     if: github.event.client_payload.event_type == 'security-checks'
-
+  
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
+  
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
+  
       - name: Extract Variables from Event Payload
         run: |
           echo "IMAGE_NAME=${{ github.event.client_payload.image_name }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ github.event.client_payload.image_tag }}" >> $GITHUB_ENV
-
+          echo "GITHUB_TOKEN=${{ github.event.client_payload.github_token }}" >> $GITHUB_ENV
+  
       - name: Install Grype
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-
-      - name: Install Gitleaks
-        run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.25.1/gitleaks-linux-amd64 -o /usr/local/bin/gitleaks
-          chmod +x /usr/local/bin/gitleaks
-
+  
       - name: Install Hadolint
         run: |
           wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
           chmod +x /usr/local/bin/hadolint
-
+  
       - name: Install Syft
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-
+  
       - name: Install Trivy
         run: |
           sudo apt-get update && sudo apt-get install -y trivy
-
+  
       - name: Run Gitleaks
-        run: |
-          gitleaks detect --source . --report-format json --report-path gitleaks_report.json
-
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          scan-path: "."
+          output: "gitleaks_report.json"
+        env:
+          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+  
       - name: Run Hadolint
         run: |
           hadolint Dockerfile > hadolint_report.txt
-
+  
       - name: Scan Docker Image with Grype
         run: |
           grype ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > grype_report.json
-
+  
       - name: Generate SBOM with Syft
         run: |
           syft ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > sbom.json
-
+  
       - name: Vulnerability Scan with Trivy
         run: |
           trivy image --format json --output trivy_report.json ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-
+  
       - name: Combine Reports
         run: |
           echo "Security Report - $(date)" > security_report.txt
@@ -108,9 +108,10 @@ jobs:
           cat sbom.json >> security_report.txt
           echo "\nTrivy Report:" >> security_report.txt
           cat trivy_report.json >> security_report.txt
-
+  
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
           name: security_report
           path: security_report.txt
+
