@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    if: github.event_type == 'docker-build-push'
 
     steps:
       - name: Checkout Repository
@@ -38,6 +39,7 @@ jobs:
 
   security-checks:
     runs-on: ubuntu-latest
+    if: github.event_type == 'security-checks'
 
     steps:
       - name: Checkout Repository
