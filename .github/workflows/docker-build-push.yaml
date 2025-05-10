@@ -104,17 +104,42 @@ jobs:
       - name: Combine Reports
         run: |
           echo "Security Report - $(date)" > security_report.txt
-          echo "\n--- Hadolint ---" >> security_report.txt
-          cat hadolint_report.txt >> security_report.txt || true
-          echo "\n--- Grype ---" >> security_report.txt
-          cat grype_report.json >> security_report.txt || true
-          echo "\n--- Syft (SBOM) ---" >> security_report.txt
-          cat sbom.json >> security_report.txt || true
-          echo "\n--- Trivy ---" >> security_report.txt
-          cat trivy_report.json >> security_report.txt || true
-          echo "\n--- Gitleaks ---" >> security_report.txt
-          echo "(Report available in GitHub Actions logs)" >> security_report.txt
-
+      
+          echo -e "\n--- Hadolint ---" >> security_report.txt
+          if [ -s hadolint_report.txt ]; then
+            cat hadolint_report.txt >> security_report.txt
+          else
+            echo "No Hadolint output found or file is empty." >> security_report.txt
+          fi
+      
+          echo -e "\n--- Grype ---" >> security_report.txt
+          if [ -s grype_report.json ]; then
+            jq '.' grype_report.json >> security_report.txt 2>/dev/null || cat grype_report.json >> security_report.txt
+          else
+            echo "No Grype output found or file is empty." >> security_report.txt
+          fi
+      
+          echo -e "\n--- Syft (SBOM) ---" >> security_report.txt
+          if [ -s sbom.json ]; then
+            jq '.' sbom.json >> security_report.txt 2>/dev/null || cat sbom.json >> security_report.txt
+          else
+            echo "No SBOM output found or file is empty." >> security_report.txt
+          fi
+      
+          echo -e "\n--- Trivy ---" >> security_report.txt
+          if [ -s trivy_report.json ]; then
+            jq '.' trivy_report.json >> security_report.txt 2>/dev/null || cat trivy_report.json >> security_report.txt
+          else
+            echo "No Trivy output found or file is empty." >> security_report.txt
+          fi
+      
+          echo -e "\n--- Gitleaks ---" >> security_report.txt
+          if [ -s gitleaks_report.json ]; then
+            jq '.' gitleaks_report.json >> security_report.txt 2>/dev/null || cat gitleaks_report.json >> security_report.txt
+          else
+            echo "No Gitleaks output found or file is empty." >> security_report.txt
+          fi
+          
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
