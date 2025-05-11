@@ -139,7 +139,8 @@ jobs:
           else
             echo "No Gitleaks output found or file is empty." >> security_report.txt
           fi
-          
+      
+      # This requires Read-Write access of workflow. In repository go to Settings->Actions->General->Workflow permissions
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
