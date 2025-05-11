@@ -1,22 +1,28 @@
-# https://hub.docker.com/_/golang
-FROM golang:1.24-alpine AS build
+# https://hub.docker.com/_/node
+FROM node:23-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+# Copy package files first to leverage Docker cache for dependencies
+COPY package*.json ./
 
-RUN go mod tidy
+RUN npm ci
 
-COPY . ./
+COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+RUN npm run build
 
-FROM alpine:latest
+# Create the final image with only runtime dependencies
+FROM node:23-alpine AS runner
 
 WORKDIR /app
 
-COPY --from=build /app/main .
+# Copy the necessary files from the build stage
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
-EXPOSE 5005
+EXPOSE 3000
 
-CMD ["./main"]
+CMD ["npm", "start"]
